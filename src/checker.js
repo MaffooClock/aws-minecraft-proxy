@@ -1,5 +1,5 @@
 import mc from "minecraft-protocol";
-import { silly, log, error } from "./debug.js";
+import { silly, info, error } from "./debug.js";
 import { timeoutPromise } from "./utils.js";
 
 const TIMEOUT_ERR = "TIMEOUT";

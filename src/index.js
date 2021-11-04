@@ -1,33 +1,13 @@
 #!/usr/bin/env node
-import fs from "fs";
+
 import path from "path";
 import childProcess from "child_process";
-import { silly, log, error } from "./debug.js";
+import { config } from "./config.js";
+import { silly, info, error } from "./debug.js";
 import Server from "./server.js";
 import dirname from "./dirname.cjs";
 const { __dirname } = dirname;
 
-// make sure configuration is specified in package.json
-const pkg = JSON.parse(
-    fs.readFileSync(path.join(__dirname, "../package.json"))
-);
-const config = pkg["minecraft-aws"];
-if (!config || !config.target || !config.commands) {
-    console.log(`The "minecraft-aws" configuration is missing from package.json.
-Add the following (and customize it):
-"minecraft-aws": ${JSON.stringify(
-        {
-            target: { host: "localhost", port: 25565 },
-            commands: {
-                start: "echo 'Starting server'",
-                shutdown: "echo 'Shutting down server'",
-            },
-        },
-        null,
-        2
-    )}`);
-    process.exit(1);
-}
 
 function executeCommand(name) {
     const command = config.commands[name];
@@ -35,7 +15,7 @@ function executeCommand(name) {
         error(`Unknown command ${name}`);
         return;
     }
-    log(`Executing command ${name}: ${command}`);
+    info(`Executing command ${name}: ${command}`);
     childProcess.exec(
         command,
         { cwd: path.join(__dirname, "..") },
@@ -48,7 +28,7 @@ function executeCommand(name) {
                 );
                 return;
             }
-            log(`Command ${name} finished:\n${stdout.toString()}`);
+            info(`Command ${name} finished:\n${stdout.toString()}`);
         }
     );
 }

@@ -1,9 +1,15 @@
+import fs from "fs";
+import path from "path";
+import dirname from "./dirname.cjs";
+const { __dirname } = dirname;
+
+import { config } from "./config.js";
 import mc from "minecraft-protocol";
 import net from "net";
 import stream from "stream";
 import Checker from "./checker.js";
 import { EventEmitter } from "events";
-import { silly, log, error } from "./debug.js";
+import { silly, info, error } from "./debug.js";
 
 const STATES = {
     unknown: 0,
@@ -11,6 +17,7 @@ const STATES = {
     inactive: 2,
     starting: 3,
     stopping: 4,
+    unauthorized: 5
 };
 const SHUTDOWN_TIMEOUT = 5 * 60 * 1000;
 
@@ -22,6 +29,7 @@ function createNoopStream() {
         read() {},
     });
 }
+
 
 export default class ProxyServer extends EventEmitter {
     constructor(
@@ -52,7 +60,7 @@ export default class ProxyServer extends EventEmitter {
         this.server.on("connection", this.handleClient.bind(this));
         this.server.on("login", this.handleLogin.bind(this));
         this.server.on("listening", () => {
-            log(`Listening on :${listenPort}`);
+            info(`Listening on :${listenPort}`);
         });
 
         // start checking if the remote is up
@@ -72,7 +80,7 @@ export default class ProxyServer extends EventEmitter {
             return;
         }
 
-        silly(`Setting state to ${state}`);
+        silly(`Setting state to ${STATES[state]}`);
         this.currentState = {
             state: state,
             time: Date.now(),
@@ -80,11 +88,11 @@ export default class ProxyServer extends EventEmitter {
 
         switch (state) {
             case STATES.starting:
-                log("Starting");
+                // info("Starting");
                 this.emit("start");
                 break;
             case STATES.stopping:
-                log("Stopping");
+                // info("Stopping");
                 this.emit("stop");
                 break;
         }
@@ -92,10 +100,11 @@ export default class ProxyServer extends EventEmitter {
 
     handleClient(client) {
         const addr = client.socket.remoteAddress;
-        silly(`Connection from ${addr}`);
+        info(`Connection from ${addr}`);
 
         // hijack the socket for proxying and exit early if we have an alive target
         if (this.checker.currentState.active) {
+
             let targetConnection;
             let socket;
             try {
@@ -134,17 +143,56 @@ export default class ProxyServer extends EventEmitter {
         client.on("error", (err) => {
             error(`Error from ${addr}`, err);
         });
+
         client.on("end", () => {
-            log(`Client connection closed (${addr})`);
+            info(`Client ${addr} disconnected`);
         });
     }
 
     handleLogin(client) {
-        this.setState(STATES.starting);
-        log(
-            `Player ${client.username} (${client.uuid}) connected, starting server`
-        );
-        client.end("Starting the server. Please reconnect once it's up");
+
+        if( config.whitelist.enabled == 'true' )
+        {
+            const whitelistFile = ( config.whitelist.path.charAt(0) == '/' ? config.whitelist.path : path.join( __dirname, '..', config.whitelist.path ) );
+            const whitelist = JSON.parse(
+                fs.readFileSync( whitelistFile )
+            );
+
+            var isWhitelisted = false;
+
+            for (var index = 0; index < whitelist.length; ++index) {
+
+                var player = whitelist[index];
+
+                if( player.uuid === client.uuid ) {
+                    isWhitelisted = true;
+                    break;
+                }
+            }
+
+            if( isWhitelisted ) {
+                this.setState(STATES.starting);
+                info(
+                    `Player ${client.username} (${client.uuid}) connected, booting up the server...`
+                );
+                client.end("Booting the server now. Please reconnect once it's up.");
+            }
+            else {
+                this.setState(STATES.unauthorized);
+                info(
+                    `Player ${client.username} (${client.uuid}) is not authorized.`
+                );
+                client.end("You're not authorized to join this server.");   
+            }
+        }
+        else
+        {
+            this.setState(STATES.starting);
+            info(
+                `Player ${client.username} (${client.uuid}) connected, booting up the server...`
+            );
+            client.end("Booting the server now. Please reconnect once it's up.");
+        }
     }
 
     beforePing(data) {
@@ -160,25 +208,22 @@ export default class ProxyServer extends EventEmitter {
         // otherwise respond with explanatory text
         data.players.max = 0;
         data.version.protocol = 1; // set a known-bad protocol so the user gets an error showing the version name
-        const secSinceChange = (
-            (Date.now() - this.currentState.time) /
-            1000
-        ).toFixed(0);
+        const secSinceChange = ( ( Date.now() - this.currentState.time ) / 1000 ).toFixed(0);
         switch (this.currentState.state) {
             case STATES.starting:
-                data.description.text = `Please wait while the server starts (${secSinceChange}s)`;
+                data.description.text = `Please wait while the server starts (${secSinceChange}s)...`;
                 data.version.name = "Booting up";
                 break;
             case STATES.stopping:
-                data.description.text = `Please wait while the server shuts down (${secSinceChange}s)`;
+                data.description.text = `Please wait while the server shuts down (${secSinceChange}s)...`;
                 data.version.name = "Shutting down";
                 break;
             case STATES.inactive:
-                data.description.text = `Server inactive. Connect to start`;
+                data.description.text = `Server inactive; connect to boot it up.`;
                 data.version.name = "Inactive";
                 break;
             default:
-                data.description.text = `Unknown status. Please wait`;
+                data.description.text = `Unknown status. Please wait...`;
                 data.version.name = "Unknown";
         }
         return data;
@@ -221,9 +266,7 @@ export default class ProxyServer extends EventEmitter {
                     : 0;
 
             if (players !== this.players.count) {
-                silly(
-                    `Player count changed (${this.players.count} -> ${players})`
-                );
+                info(`Player count changed (${this.players.count} -> ${players})`);
                 this.players = {
                     count: players,
                     time: Date.now(),
@@ -238,7 +281,7 @@ export default class ProxyServer extends EventEmitter {
                 this.players.count === 0 &&
                 Date.now() - playerTime >= SHUTDOWN_TIMEOUT
             ) {
-                log("Stopping server due to being empty");
+                info("No players are connected; stopping server...");
                 this.setState(STATES.stopping);
             }
         }

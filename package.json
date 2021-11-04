@@ -8,6 +8,7 @@
     "license": "MIT",
     "private": true,
     "scripts": {
+        "start": "DBGLEVEL=info node --experimental-vm-modules src/index.js",
         "test": "DBGLEVEL=warn node --experimental-vm-modules node_modules/.bin/jest"
     },
     "dependencies": {
@@ -19,12 +20,16 @@
     },
     "minecraft-aws": {
         "target": {
-            "host": "localhost",
+            "host": "<minecraft-server-ip-or-hostname>",
             "port": 25565
         },
         "commands": {
-            "start": "echo 'Starting server'",
-            "shutdown": "echo 'Stopping server'"
+            "start": "aws ec2 start-instances --instance-ids i-xxxxxxxxxxxxxxxxx",
+            "shutdown": "aws ec2 stop-instances --instance-ids i-xxxxxxxxxxxxxxxxx"
+        },
+        "whitelist": {
+            "enabled": "true",
+            "path": "./whitelist.json"
         }
     }
 }

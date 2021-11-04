@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 TARGET=/etc/systemd/system/minecraft-proxy.service
 CUR_PATH=`pwd`
 NODE=$(realpath $(which node))
