@@ -88,11 +88,12 @@ The original project was functional, but it had one (trivial?) drawback: any con
 Now, I could have made my changes to enable whitelist checking, and then just submit the changes in a pull request, but there were lost of other things in the code that I wanted to tweak.  Some of it was my pedantic-ness on code style, wording, and even how STDOUT was being presented.  Along the way, I found some things that were left unfinished or unused, so I kinda just kept going my own way.
   
 
-## Notes
 
-[^1]: This solution can be used with VPS providers other than AWS, but makes sense only under the following conditions:
-        a. The VPS is billed hourly, and billing stops as long as the VPS is not running
-        b. The VPS provider offers an API that can be used to manage your instances, which includes the capability to start and stop your instances
+[^1]:
+    This solution can be used with VPS providers other than AWS, but makes sense only under the following conditions:
+      - The VPS is billed hourly, and billing stops as long as the VPS is not running
+      - The VPS provider offers an API that can be used to manage your instances, which includes the capability to start and stop your instances
+    
     If you're billed regardless of instance state, or if there's no facility for remotely managing the state of your instances, then having a Proxy has no purpose and offers no benefit.
     
 [^2]: Other than installing a systemd service, the installer makes no other changes to your system.  Removing the Proxy is as simple as deleting the directory you cloned and the systemd service file.
