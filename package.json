@@ -19,12 +19,16 @@
     },
     "minecraft-aws": {
         "target": {
-            "host": "localhost",
+            "host": "<minecraft-server-ip>",
             "port": 25565
         },
         "commands": {
-            "start": "echo 'Starting server'",
-            "shutdown": "echo 'Stopping server'"
+            "start": "aws ec2 start-instances --instance-ids i-xxxxxxxxxxxxxxxxx",
+            "shutdown": "scp -q root@<minecraft-server-ip>:/opt/minecraft/server/whitelist.json ./whitelist.json && aws ec2 stop-instances --instance-ids i-xxxxxxxxxxxxxxxxx"
+        },
+        "whitelist": {
+            "enabled": "true",
+            "path": "./whitelist.json"
         }
     }
 }
