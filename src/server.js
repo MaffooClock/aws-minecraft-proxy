@@ -19,7 +19,6 @@ const STATES = {
     stopping: 4,
     unauthorized: 5
 };
-const SHUTDOWN_TIMEOUT = 5 * 60 * 1000;
 
 function createNoopStream() {
     return new stream.Duplex({
@@ -222,6 +221,10 @@ export default class ProxyServer extends EventEmitter {
                 data.description.text = `Server inactive; connect to boot it up.`;
                 data.version.name = "Inactive";
                 break;
+            case STATES.unauthorized:
+                data.description.text = `You're not authorized to join this server.`;
+                data.version.name = "Unauthorized";
+                break;
             default:
                 data.description.text = `Unknown status. Please wait...`;
                 data.version.name = "Unknown";
@@ -237,14 +240,14 @@ export default class ProxyServer extends EventEmitter {
         // make sure don't end up hanging on starting/stopping by introducing a timeout
         switch (this.currentState.state) {
             case STATES.stopping: // we keep trying to shut down if it fails
-                if (Date.now() - this.currentState.time > 5 * 60 * 1000) {
-                    error("Stopping timed out. Retrying");
+                if (Date.now() - this.currentState.time > config.timeout.shutdownWait * 60 * 1000) {
+                    error("Shutdown timed out. Retrying...");
                     this.setState(STATES.stopping, true);
                 }
                 break;
             case STATES.starting: // if starting fails, just abort
-                if (Date.now() - this.currentState.time > 5 * 60 * 1000) {
-                    error("Starting timed out. Aborting");
+                if (Date.now() - this.currentState.time > config.timeout.bootWait * 60 * 1000) {
+                    error("Boot-up timed out. Aborting.");
                     this.setState(STATES.inactive);
                 }
                 break;
@@ -259,11 +262,7 @@ export default class ProxyServer extends EventEmitter {
 
         // finally check if we should shut down
         if (this.currentState.state === STATES.active) {
-            const players =
-                this.checker.currentState.data &&
-                this.checker.currentState.data.players
-                    ? this.checker.currentState.data.players.online || 0
-                    : 0;
+            const players = ( this.checker.currentState.data && ( this.checker.currentState.data.players ? ( this.checker.currentState.data.players.online || 0 ) : 0 ) );
 
             if (players !== this.players.count) {
                 info(`Player count changed (${this.players.count} -> ${players})`);
@@ -273,15 +272,10 @@ export default class ProxyServer extends EventEmitter {
                 };
             }
 
-            const playerTime = Math.max(
-                this.players.time,
-                this.currentState.time
-            );
-            if (
-                this.players.count === 0 &&
-                Date.now() - playerTime >= SHUTDOWN_TIMEOUT
-            ) {
-                info("No players are connected; stopping server...");
+            const playerTime = Math.max( this.players.time, this.currentState.time );
+            
+            if( this.players.count === 0 && ( Date.now() - playerTime ) >= config.timeout.idleShutdown  * 60 * 1000 ) {
+                info(`No players connected for the last ${config.timeout} minutes; stopping server...`);
                 this.setState(STATES.stopping);
             }
         }

@@ -39,12 +39,20 @@ This solution was designed for EC2 on AWS, but in theory could work with any VPS
 1. Clone this repo onto the new instance that will be dedicated to the Proxy.  You can clone it anywhere, doesn't have to be a proper system location.
 1. Run `install.sh`, which will install dependencies and start the service for the first time.  See note[^2]
     - If your server uses systemd, a system service will automatically be installed.
-      *Note: the service will be configured to run as whatever user is currently being used to install the Proxy!*
+      _Note: the service will be configured to run as whatever user is currently being used to install the Proxy!_
 1. Update `package.json` so that the `minecraft-aws` object has appropriate configuration values:
     - `target`: the IP address or hostname of the Minecraft server, as well as the TCP port (default is 25565)
     - `commands`: the commands needed to startup and shutdown the EC2 instance (should be `awscli ec2` commands, but could be augmented or changed altogether if you know what you're doing)
     - `whitelist`: if you want the Proxy to respect your whitelist, set the path to the whitelist.json file that you copied from the Minecraft server
-1. Run `sudo systemctl restart minecraft-proxy` to reload the proxy server so it uses the new config.
+    - `timeout`: 
+      - `bootWait`: this is the amount of time (in minutes) to wait for the server to start before we consider it failed
+      - `shutdownWait`: this is the amount of time (in minutes) to wait for the server to shutdown before we consider it failed
+      - `idleWait`: this is the amount of time (in minutes) that the Proxy will wait before shutting down the Minecraft server awhen there are no players connected
+1. Run `sudo systemctl restart minecraft-proxy` to reload the Proxy server so it uses the new config.
+
+**Notes about timeout values:**
+  - With respect to `bootWait`, consider the amount of time it takes for the server to boot up _and_ the time it takes for Minecraft to become ready.  Heavily-modded instances can take several minutes to become fully ready.  For whatever length of time this is, add at least an extra two or three minutes to the `bootWait` time to prevent the Proxy from prematurely assuming the startup failed.  For a vanilla Minecraft, you might start with three to five minutes; for a heavily-modded Minecraft, you might start with 10 minutes.
+  - The `idleWait` does not come into effect until _after_ the server has booted up, so it's not necessary to consider boot-up time for this value.
 
 Below is an example configuration.  **Bonus:** notice how the `shutdown` command first copies the whitelist.json file before actually shutting down the instance, which ensures the Proxy always has a current version.
 
@@ -62,6 +70,11 @@ Below is an example configuration.  **Bonus:** notice how the `shutdown` command
         "whitelist": {
             "enabled": "true",
             "path": "./whitelist.json"
+        },
+        "timeout": {
+            "bootWait": 10,
+            "shutdownWait": 3,
+            "idleWait": 45
         }
     }
 }

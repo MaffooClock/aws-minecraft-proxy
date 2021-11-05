@@ -30,6 +30,11 @@
         "whitelist": {
             "enabled": "true",
             "path": "./whitelist.json"
+        },
+        "timeout": {
+            "bootWait": 10,
+            "shutdownWait": 3,
+            "idleShutdown": 45
         }
     }
 }
